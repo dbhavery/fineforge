@@ -1,0 +1,19 @@
+# Core dependencies (always required)
+click>=8.0
+pyyaml>=6.0
+rich>=13.0
+
+# Training dependencies (install with: pip install fineforge[train])
+# torch>=2.0
+# transformers>=4.40
+# peft>=0.12
+# trl>=0.9
+# bitsandbytes>=0.43
+# datasets>=2.20
+# accelerate>=0.30
+
+# Export dependencies (install with: pip install fineforge[export])
+# llama-cpp-python>=0.2
+
+# Dev dependencies (install with: pip install fineforge[dev])
+# pytest>=8.0

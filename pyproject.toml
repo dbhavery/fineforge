@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fineforge"
+version = "0.1.0"
+description = "Local LoRA fine-tuning pipeline for consumer GPUs"
+authors = [{name = "Donald Havery", email = "dbhavery@gmail.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["fine-tuning", "lora", "qlora", "llm", "pytorch", "ollama"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "click>=8.0",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+train = [
+    "torch>=2.0",
+    "transformers>=4.40",
+    "peft>=0.12",
+    "trl>=0.9",
+    "bitsandbytes>=0.43",
+    "datasets>=2.20",
+    "accelerate>=0.30",
+]
+export = [
+    "llama-cpp-python>=0.2",
+]
+dev = [
+    "pytest>=8.0",
+]
+all = [
+    "fineforge[train,export,dev]",
+]
+
+[project.scripts]
+fineforge = "fineforge.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/dbhavery/fineforge"
+Repository = "https://github.com/dbhavery/fineforge"
+Issues = "https://github.com/dbhavery/fineforge/issues"
+
+[tool.setuptools.packages.find]
+include = ["fineforge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

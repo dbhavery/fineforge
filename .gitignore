@@ -44,3 +44,4 @@ data/eval.jsonl
 *.log
 wandb/
 runs/
+data/

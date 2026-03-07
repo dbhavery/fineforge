@@ -187,12 +187,12 @@ class Trainer:
                 self.config.base_model,
                 quantization_config=bnb_config,
                 device_map="auto",
-                trust_remote_code=True,
+                trust_remote_code=self.config.trust_remote_code,
             )
 
             tokenizer = transformers.AutoTokenizer.from_pretrained(
                 self.config.base_model,
-                trust_remote_code=True,
+                trust_remote_code=self.config.trust_remote_code,
             )
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token

@@ -67,6 +67,7 @@ class TrainConfig:
     # Data handling
     chat_template: str = "chatml"
     eval_dataset_path: Optional[str] = None
+    trust_remote_code: bool = False
 
     def validate(self) -> list[str]:
         """Validate configuration values.

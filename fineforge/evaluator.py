@@ -200,10 +200,12 @@ class Evaluator:
         base_model: str,
         tuned_model_path: str | Path,
         prompts: list[EvalPrompt],
+        trust_remote_code: bool = False,
     ) -> None:
         self.base_model = base_model
         self.tuned_model_path = Path(tuned_model_path)
         self.prompts = prompts
+        self.trust_remote_code = trust_remote_code
 
     def _generate(
         self,
@@ -277,7 +279,7 @@ class Evaluator:
         # Load base model
         console.print(f"[bold cyan]Loading base model:[/bold cyan] {self.base_model}")
         tokenizer = AutoTokenizer.from_pretrained(
-            self.base_model, trust_remote_code=True
+            self.base_model, trust_remote_code=self.trust_remote_code
         )
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -286,7 +288,7 @@ class Evaluator:
             self.base_model,
             device_map="auto",
             torch_dtype=torch.float16,
-            trust_remote_code=True,
+            trust_remote_code=self.trust_remote_code,
         )
 
         # Generate base responses
@@ -313,7 +315,7 @@ class Evaluator:
             self.base_model,
             device_map="auto",
             torch_dtype=torch.float16,
-            trust_remote_code=True,
+            trust_remote_code=self.trust_remote_code,
         )
         tuned_model = PeftModel.from_pretrained(tuned_base, str(self.tuned_model_path))
 

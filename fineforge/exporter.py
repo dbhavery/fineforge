@@ -64,6 +64,7 @@ def merge_adapter(
     base_model: str,
     adapter_path: str | Path,
     output_dir: str | Path,
+    trust_remote_code: bool = False,
 ) -> Path:
     """Merge a LoRA adapter into the base model.
 
@@ -103,7 +104,7 @@ def merge_adapter(
             base_model,
             device_map="auto",
             torch_dtype=torch.float16,
-            trust_remote_code=True,
+            trust_remote_code=trust_remote_code,
         )
 
         console.print(f"[bold cyan]Loading adapter:[/bold cyan] {adapter_path}")
@@ -116,7 +117,7 @@ def merge_adapter(
         model.save_pretrained(str(merged_dir))
 
         tokenizer = AutoTokenizer.from_pretrained(
-            base_model, trust_remote_code=True
+            base_model, trust_remote_code=trust_remote_code
         )
         tokenizer.save_pretrained(str(merged_dir))
 

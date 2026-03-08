@@ -1,204 +1,53 @@
 # FineForge
-[![CI](https://github.com/dbhavery/fineforge/actions/workflows/ci.yml/badge.svg)](https://github.com/dbhavery/fineforge/actions/workflows/ci.yml)
 
-**Local LoRA fine-tuning pipeline for consumer GPUs.**
+QLoRA fine-tuning CLI for consumer GPUs -- takes you from raw chat data to a fine-tuned model running in Ollama, entirely on local hardware.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/downloads/)
-[![PyPI](https://img.shields.io/badge/pypi-fineforge-orange.svg)](https://pypi.org/project/fineforge/)
+## Why I Built This
 
-FineForge is an end-to-end CLI tool that takes you from raw chat data to a fine-tuned model running in Ollama. It curates your dataset (validate, score, deduplicate, split), trains QLoRA adapters with 4-bit quantization on consumer GPUs, evaluates before/after quality, and exports the result to GGUF for local inference.
+Cloud fine-tuning costs $2-5/hr on GPU instances and requires uploading your data to third-party servers. With QLoRA 4-bit quantization, a 7B parameter model fits in 8GB VRAM and trains on a single consumer GPU. I wanted a single CLI that handles the full pipeline: curate dataset, train adapter, evaluate against base model, export to GGUF, register in Ollama. No notebooks, no cloud, no manual steps between stages.
 
-## Pipeline
+## What It Does
 
-```
-  JSONL Data ──> Curate ──> Train (QLoRA) ──> Evaluate ──> Export (GGUF) ──> Ollama
-     │             │            │                │              │              │
-     │        validate       4-bit quant     base vs tuned    merge +       register
-     │        score          LoRA adapters   side-by-side     quantize      & run
-     │        dedup          SFTTrainer      score compare    Modelfile
-     │        split
-```
+- **Full pipeline in 5 commands** -- `prepare` (validate/score/dedup/split), `train` (QLoRA), `eval` (base vs. tuned comparison), `export` (GGUF + Ollama registration)
+- **Trains 7B models on 8GB VRAM** -- QLoRA 4-bit quantization reduces memory footprint by 75% vs. full fine-tuning; $0 cloud compute cost
+- **YAML training configs** -- all hyperparameters in one file, no code changes between training runs
+- **Dataset curation** -- validates chat format, scores quality, deduplicates, splits train/eval automatically
+- **Before/after evaluation** -- side-by-side comparison of base model vs. fine-tuned model on test prompts
 
-## Hardware Requirements
+## Key Technical Decisions
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| GPU VRAM  | 8 GB    | 16-24 GB    |
-| RAM       | 16 GB   | 32+ GB      |
-| Disk      | 20 GB   | 50+ GB      |
-
-Tested on NVIDIA RTX 3090 (24 GB VRAM) with 7B parameter models. QLoRA 4-bit quantization makes fine-tuning 7B models possible on 8 GB GPUs.
+- **QLoRA over full fine-tuning** -- makes 7B-13B models trainable on consumer GPUs (RTX 3060 and up). Full fine-tuning of a 7B model requires 56+ GB VRAM; QLoRA brings it under 8GB.
+- **Click CLI over notebook workflow** -- reproducible training runs, scriptable in CI/CD. Notebooks encourage one-off experiments; CLI enforces repeatable configuration.
+- **Lazy imports for GPU dependencies** -- `torch`, `transformers`, `peft`, `trl` are only imported inside functions that need them. The CLI, dataset tools, and tests all run without a GPU installed. `pip install fineforge` works on any machine; `pip install fineforge[train]` adds GPU dependencies.
+- **OpenAI chat format** -- standard JSONL with `messages` array. Compatible with existing chat export tools, no custom format to learn.
 
 ## Quick Start
 
-### Install
-
 ```bash
-# Core (dataset tools, CLI) -- no GPU required
+# Core (dataset tools, no GPU required)
 pip install fineforge
 
 # With training support (requires CUDA GPU)
 pip install fineforge[train]
 
-# Everything (training + GGUF export + dev tools)
-pip install fineforge[all]
-```
-
-Or install from source:
-
-```bash
-git clone https://github.com/dbhavery/fineforge.git
-cd fineforge
-pip install -e ".[dev]"
-```
-
-### Full Workflow
-
-```bash
-# 1. Prepare your dataset
+# Full pipeline
 fineforge prepare my_chats.jsonl --output-dir ./data --min-quality 0.4
-
-# 2. Create a training config
-cat > config.yaml << 'EOF'
-base_model: unsloth/Qwen2.5-7B
-dataset_path: ./data/train.jsonl
-output_dir: ./output
-lora_r: 16
-lora_alpha: 32
-num_epochs: 3
-learning_rate: 2e-4
-batch_size: 4
-max_seq_length: 2048
-EOF
-
-# 3. Train
 fineforge train config.yaml
-
-# 4. Evaluate
-fineforge eval ./output/adapter --prompts test_prompts.yaml --base-model unsloth/Qwen2.5-7B
-
-# 5. Export to GGUF and register in Ollama
-fineforge export ./output/adapter \
-  --base-model unsloth/Qwen2.5-7B \
-  --quantization q4_k_m \
-  --ollama-name my-tuned-model
+fineforge eval ./output/adapter --prompts test_prompts.yaml
+fineforge export ./output/adapter --quantization q4_k_m --ollama-name my-model
 ```
 
-## Dataset Format
+## Lessons Learned
 
-FineForge uses the OpenAI chat format. Each line in your JSONL file is a conversation:
+**VRAM management is the critical constraint, and one size does not fit all.** Batch size and gradient accumulation need careful tuning per model architecture. A config that trains Qwen2.5-7B smoothly will OOM on Llama-3-8B because of different attention head counts and hidden dimensions. The default config (`batch_size: 4, gradient_accumulation: 4`) is conservative enough for most 7B models on 24GB, but 8GB cards need `batch_size: 1` with higher gradient accumulation to compensate. I learned this by bricking training runs, not from documentation.
 
-```json
-{
-  "messages": [
-    {"role": "system", "content": "You are a helpful coding assistant."},
-    {"role": "user", "content": "How do I reverse a list in Python?"},
-    {"role": "assistant", "content": "Use the built-in `reversed()` function or slice notation: `my_list[::-1]`."}
-  ]
-}
+## Tests
+
+```bash
+pip install -e ".[dev]"
+pytest tests/ -v
 ```
 
-Requirements:
-- Each sample must have at least one `user` and one `assistant` message.
-- `system` message is optional but recommended.
-- Multi-turn conversations (multiple user/assistant pairs) are supported.
+---
 
-See `examples/chat_format.jsonl` for more examples.
-
-## Training Config Reference
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `base_model` | `unsloth/Qwen2.5-7B` | HuggingFace model ID |
-| `dataset_path` | `./data/train.jsonl` | Path to training JSONL |
-| `output_dir` | `./output` | Output directory |
-| `lora_r` | `16` | LoRA rank |
-| `lora_alpha` | `32` | LoRA scaling factor |
-| `lora_dropout` | `0.05` | LoRA dropout |
-| `lora_target_modules` | `[q_proj, k_proj, v_proj, o_proj]` | Target linear layers |
-| `learning_rate` | `2e-4` | Peak learning rate |
-| `num_epochs` | `3` | Training epochs |
-| `batch_size` | `4` | Per-device batch size |
-| `gradient_accumulation_steps` | `4` | Steps before optimizer update |
-| `max_seq_length` | `2048` | Max token sequence length |
-| `warmup_steps` | `10` | LR warmup steps |
-| `fp16` | `true` | Mixed-precision FP16 |
-| `bf16` | `false` | Mixed-precision BF16 (Ampere+) |
-| `seed` | `42` | Random seed |
-
-## CLI Reference
-
-### `fineforge prepare`
-
-Curate and validate a chat dataset.
-
-```
-fineforge prepare <input.jsonl> [OPTIONS]
-
-Options:
-  -o, --output-dir    Output directory for train/eval JSONL  [default: ./data]
-  -q, --min-quality   Minimum quality score (0.0-1.0)        [default: 0.3]
-  -e, --eval-ratio    Fraction held out for evaluation       [default: 0.1]
-  -s, --seed          Random seed for split                  [default: 42]
-```
-
-### `fineforge train`
-
-Run QLoRA fine-tuning from a YAML config.
-
-```
-fineforge train <config.yaml>
-```
-
-### `fineforge eval`
-
-Evaluate a fine-tuned model against its base model.
-
-```
-fineforge eval <adapter_path> [OPTIONS]
-
-Options:
-  -p, --prompts       Path to test prompts YAML              [required]
-  -b, --base-model    Base model to compare against          [default: unsloth/Qwen2.5-7B]
-  -o, --output        Save results to JSON file
-```
-
-### `fineforge export`
-
-Export adapter to GGUF and optionally register in Ollama.
-
-```
-fineforge export <adapter_path> [OPTIONS]
-
-Options:
-  -b, --base-model       Base model ID                       [default: unsloth/Qwen2.5-7B]
-  -f, --format           Export format                       [default: gguf]
-  -q, --quantization     GGUF quantization type              [default: q4_k_m]
-  --ollama-name          Register in Ollama with this name
-  --system-prompt        Default system prompt for Modelfile
-  -o, --output-dir       Output directory                    [default: ./output]
-  --llama-cpp-path       Path to llama.cpp directory
-```
-
-## Architecture
-
-```
-fineforge/
-  __init__.py        # Package version
-  cli.py             # Click CLI entry point
-  config.py          # TrainConfig dataclass + YAML I/O
-  dataset.py         # Load, validate, score, filter, split JSONL datasets
-  trainer.py         # QLoRA training wrapper (lazy torch/transformers imports)
-  evaluator.py       # Before/after model comparison
-  exporter.py        # GGUF export + Ollama registration
-```
-
-Key design decisions:
-- **Lazy imports**: `torch`, `transformers`, `peft`, `trl` are only imported inside the functions that need them. The CLI, dataset tools, and tests all work without GPU dependencies installed.
-- **Modular pipeline**: Each stage (prepare, train, eval, export) is independent. You can use just the dataset curator without ever training.
-- **Config-driven**: Training is fully configured via YAML. No code changes needed to adjust hyperparameters.
-
-## License
-
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE).

@@ -1,7 +1,7 @@
 # Core dependencies (always required)
-click>=8.0
-pyyaml>=6.0
-rich>=13.0
+click==8.1.8
+pyyaml==6.0.2
+rich==13.9.4
 
 # Training dependencies (install with: pip install fineforge[train])
 # torch>=2.0

@@ -1,4 +1,5 @@
 # FineForge
+[![CI](https://github.com/dbhavery/fineforge/actions/workflows/ci.yml/badge.svg)](https://github.com/dbhavery/fineforge/actions/workflows/ci.yml)
 
 **Local LoRA fine-tuning pipeline for consumer GPUs.**
 

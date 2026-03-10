@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "fineforge"
 version = "0.1.0"
 description = "Local LoRA fine-tuning pipeline for consumer GPUs"
-authors = [{name = "Donald Havery", email = "dbhavery@gmail.com"}]
+authors = [{name = "Donald Havery", email = "dbhavery@users.noreply.github.com"}]
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
